@@ -2,8 +2,9 @@
 #
 # CSCB58 Winter 2022 Assembly Final Project
 # University of Toronto, Scarborough
-#
-# Student: Name, Student Number, UTorID, official email
+# 
+#  Student: Name, Student Number, UTorID, official email
+#  Zhitao Xu: 1006668697, xuzhitao, zhitao.xu@mail.utoronto.ca
 #
 # Bitmap Display Configuration:
 # - Unit width in pixels: 8 (update this as needed)
@@ -15,6 +16,7 @@
 # Which milestones have been reached in this submission?
 # (See the assignment handout for descriptions of the milestones)
 # - Milestone 1/2/3 (choose the one the applies)
+# - currently 0
 #
 # Which approved features have been implemented for milestone 3?
 # (See the assignment handout for the list of additional features)
@@ -34,5 +36,34 @@
 #
 #####################################################################
 
+.eqv BASE_ADDRESS	0x10008000
 
-# 
+# colours
+.eqv BLACK 0x000000
+
+
+.text 
+.globl main
+
+main: 
+
+initialize_screen:
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
