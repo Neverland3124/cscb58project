@@ -55,8 +55,10 @@
 
 
 .data
-HEART: .word 5
-PLATFORM: .word 1692, 2240, 3908, 4924, 5908, 6836, 7564
+me_location: .word 6932
+heart: .word 5
+platform: .word 1692, 2240, 3908, 4924, 5908, 6836, 7564
+offset: .word 512
 
 .text 
 .globl main
@@ -77,83 +79,155 @@ start:
 	# initialize the screen
 	jal initialize_screen
 
-	###################### test break
-	li $v0, 32
-	li $a0, 2000
-	syscall
-	###################### test break
-
 	# get position of me and the floor in the map
-	# t1 is me, t2 is the win, platform is store in data
-	li $t1, 7056
-	# health is 8
-	li $t9, 5
+	li $v0, 32
+	li $a0, 500
+	syscall
+
+
+	# load heart to t9
+	la $t1, heart
+	lw $t9, 0($t1)
 game_loop:
-	bltz $t9, game_over
-	# check the color under me
-	addi $t2, $t0, 512
-	add $t2, $t1, $t2
-	beq $t2, WHITE, no_gravity # if color is not white, not falling
+	bltz $t9, gameover
+
+	# load me_location to $t2
+	la $t1, me_location
+	lw $t2, 0($t1)
+	# check the color under me (offset 512)
+	addi $t4, $t2, 512
+	
+	# t2 is the position under me, compare t2 with white
+	la $t0, base_address
+	add $t0, $t0, $t4
+	lw  $t3, 0($t0)
+	beq $t3, WHITE, no_gravity # if color is not white, not falling
 	# have gravity (in the space), falling
-	move $a0, $t1
-	erase_me
-	update_me
+	move $a0, $t2
+	jal erase_me
+	li $a1, 128
+	jal draw_me
+	
 no_gravity:
 
-	jal platform_update
+	# milestone 3
+	# jal platform_update
+
+	# able to control me
 	jal me_update
-
-
+update_done:
+	# weight for 40s for next loop
 	li $v0, 32
 	li $a0, 40
 	syscall
 	
-	#la $t0, SHIP_HEALTH	# $t0 = address of SHIP_HEALTH
-	lw $t0, 0($t0)		# $t1 = ship health
 	
-
+	# la $t0, heart  # $t0 = address of SHIP_HEALTH
+	# sw $t9, 0($t0)		# $t9 = ship health
+	
 	j game_loop
-	
-	# this will remove everything
-	move $a0, $t1
-	jal erase_me
-	move $a0, $t2
-	jal erase_floor
-	move $a0, $t3
-	jal erase_floor
-	move $a0, $t4
-	jal erase_floor
-	move $a0, $t5
-	jal erase_floor
 
-	j end
 
-update_me:
+
+me_update:
 	# get what from keyboard
 	li $t8, 0xffff0000
 	lw $t7, ($t8)
-	bne $t7, 1, update_ship_end	# no input, go back to what caller
+	bne $t7, 1, donothing1	# no input, go back to what caller
 	lw $t7, 4($t8)				# have input, put input to t7
-	
-	# save me to t0
-
 	# DETERMINE WHICH DIRECTION IT IS GOING
 	beq $t7, 119, A_JUMP		# if w was pressed
 	beq $t7, 97, A_LEFT			# if a was pressed
-	beq $t7, 115, A_RIGHT		# if d was pressed
+	beq $t7, 100, A_RIGHT		# if d was pressed
 	beq $t7, 32, A_JUMP			# if space was pressed
 	beq $t7, 112, A_RESTART		# if P was pressed
-	jr $ra						# if not them, back to before
+	j update_done				# if not them, back to before
+
 
 A_JUMP:
+	# load me_location to $t2
+	la $t1, me_location
+	lw $t2, 0($t1)
 
+	addi $t4, $t2, -128
+	# check if it's black
+	la $t0, base_address
+	add $t0, $t0, $t4
+	lw  $t3, 0($t0)
+	bne $t3, BLACK, donothing1 # if color is not white, not falling
+	move $a0, $t2
+	jal erase_me
+	li $a1, -256
+	jal draw_me
 
-platform_update:
+donothing1: 
+	j update_done
+
+A_LEFT:
+	# load me_location to $t2
+	la $t1, me_location
+	lw $t2, 0($t1)
+	# check the color before me (offset 512)
+	addi $t4, $t2, -4
+	# check if it's black
+	la $t0, base_address
+	add $t0, $t0, $t4
+	lw  $t3, 0($t0)
+	bne $t3, BLACK, donothing2 # if color is not white, not falling
+	move $a0, $t2
+	jal erase_me
+	li $a1, -4
+	jal draw_me
+
+donothing2: 
+	j update_done
+
+A_RIGHT:
+	# load me_location to $t2
+	la $t1, me_location
+	lw $t2, 0($t1)
+	# check the color before me (offset 512)
+	addi $t4, $t2, 8
+	# check if it's black
+	la $t0, base_address
+	add $t0, $t0, $t4
+	lw  $t3, 0($t0)
+	bne $t3, BLACK, donothing3 # if color is not white, not falling
+	move $a0, $t2
+	jal erase_me
+	li $a1, 4
+	jal draw_me
+
+donothing3: 
+	j update_done
+
+A_RESTART:
+	# set everything back
+	j game_loop
+# platform_update:
 	# update all the plateforms 
 	# make them move left or right
 
+draw_me:
+	la $t0, base_address
+	# load the position to me_location
+	add $s0, $a0, $a1
+	la $s1, me_location
+	sw $s0, 0($s1)
+	# draw correspond me
+	add $t0, $t0, $s0
+	
+	li $s0, ORANGE
+	sw $s0, 4($t0)
+	sw $s0, 128($t0)
+	sw $s0, 136($t0)
+	sw $s0, 260($t0)
+	sw $s0, 384($t0)
+	sw $s0, 388($t0)
+	sw $s0, 392($t0)
+	jr $ra
 
-game_over:
+gameover:
 	j end
 
 erase_me:
@@ -205,7 +279,7 @@ show_gamename:
 	la $t0, base_address
 	# use two color, t1 and t2
 	li $t1, WHITE
-	li $t2, ORANGE
+	li $t4, ORANGE
 	li $t2, GOLDEN
 	li $t3, RED
 	sw $t1, 400($t0)
@@ -563,7 +637,7 @@ show_gamename:
 	sw $t1, 7136($t0)
 	sw $t1, 7140($t0)
 	sw $t1, 7144($t0)
-	sw $t3, 7200($t0)
+	sw $t4, 7072($t0)
 	sw $t1, 7236($t0)
 	sw $t1, 7240($t0)
 	sw $t1, 7244($t0)
@@ -574,12 +648,12 @@ show_gamename:
 	sw $t1, 7264($t0)
 	sw $t1, 7268($t0)
 	sw $t1, 7272($t0)
-	sw $t3, 7324($t0)
-	sw $t3, 7332($t0)
-	sw $t3, 7456($t0)
-	sw $t3, 7580($t0)
-	sw $t3, 7584($t0)
-	sw $t3, 7588($t0)
+	sw $t4, 7196($t0)
+	sw $t4, 7204($t0)
+	sw $t4, 7328($t0)
+	sw $t4, 7452($t0)
+	sw $t4, 7456($t0)
+	sw $t4, 7460($t0)
 	sw $t1, 7700($t0)
 	sw $t1, 7704($t0)
 	sw $t1, 7708($t0)
@@ -967,22 +1041,22 @@ initialize_screen:
 	sw $t4, 7036($t0)
 	sw $t4, 7040($t0)
 	sw $t4, 7044($t0)
-	sw $t7, 7060($t0)
+	sw $t7, 6936($t0)
 	sw $t4, 7160($t0)
 	sw $t4, 7164($t0)
 	sw $t4, 7168($t0)
-	sw $t7, 7184($t0)
-	sw $t7, 7192($t0)
+	sw $t7, 7060($t0)
+	sw $t7, 7068($t0)
 	sw $t4, 7292($t0)
 	sw $t4, 7296($t0)
 	sw $t4, 7300($t0)
-	sw $t7, 7316($t0)
+	sw $t7, 7192($t0)
 	sw $t4, 7416($t0)
 	sw $t4, 7420($t0)
 	sw $t4, 7424($t0)
-	sw $t7, 7440($t0)
-	sw $t7, 7444($t0)
-	sw $t7, 7448($t0)
+	sw $t7, 7324($t0)
+	sw $t7, 7316($t0)
+	sw $t7, 7320($t0)
 	sw $t4, 7548($t0)
 	sw $t4, 7552($t0)
 	sw $t4, 7556($t0)
