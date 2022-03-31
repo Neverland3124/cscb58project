@@ -50,15 +50,18 @@
 .eqv GOLDEN 0x00ffd700
 .eqv PINK 0x00ff00c8
 .eqv GREEN 0x0000ff00
-
+.eqv WAITTIME 3
+.eqv JUMP_COUNTER 5
 # data need to store
 
 
 .data
 me_location: .word 6932
 heart: .word 5
-platform: .word 1692, 2240, 3908, 4924, 5908, 6836, 7564
+platform: .word 1692, 2240, 3908, 4924, 5976, 6836, 7564
 offset: .word 512
+jump_counter: .word 0
+counter: .word 0
 
 .text 
 .globl main
@@ -88,6 +91,7 @@ start:
 	# load heart to t9
 	la $t1, heart
 	lw $t9, 0($t1)
+	
 game_loop:
 	bltz $t9, gameover
 
@@ -101,8 +105,22 @@ game_loop:
 	la $t0, base_address
 	add $t0, $t0, $t4
 	lw  $t3, 0($t0)
-	beq $t3, WHITE, no_gravity # if color is not white, not falling
+	
+	bne $t3, BLACK, no_gravity # if color is not white, not falling
+	
+	# make sure the jump_count is 0 to fall
+	la $t5, jump_counter
+	lw $t6, 0($t5)
+	bnez $t6, no_gravity
+	
+	addi $t0, $t0, 4
+	lw  $t3, 0($t0)
+	bne $t3, BLACK, no_gravity # if color is not white, not falling
+	addi $t0, $t0, 4
+	lw  $t3, 0($t0)
+	bne $t3, BLACK, no_gravity # if color is not white, not falling
 	# have gravity (in the space), falling
+	
 	move $a0, $t2
 	jal erase_me
 	li $a1, 128
@@ -115,8 +133,9 @@ no_gravity:
 
 	# able to control me
 	jal me_update
+	
 update_done:
-	# weight for 40s for next loop
+	# weight for 40ms for next loop
 	li $v0, 32
 	li $a0, 40
 	syscall
@@ -124,42 +143,143 @@ update_done:
 	
 	# la $t0, heart  # $t0 = address of SHIP_HEALTH
 	# sw $t9, 0($t0)		# $t9 = ship health
-	
 	j game_loop
 
 
-
 me_update:
+	# if the object is jumping, it need to jump and do the corresponding job (update the value)
+	la $t5, jump_counter
+	lw $t6, 0($t5)
+	# if it's 0, then nothing, regular update
+	# if it's not 0, updating and back
+	bnez $t6, two_job
+
+
+determine: 
 	# get what from keyboard
 	li $t8, 0xffff0000
 	lw $t7, ($t8)
+	
 	bne $t7, 1, donothing1	# no input, go back to what caller
 	lw $t7, 4($t8)				# have input, put input to t7
+	
+	# restart will be faster than anycase
+	beq $t7, 112, A_RESTART		# if P was pressed
 	# DETERMINE WHICH DIRECTION IT IS GOING
 	beq $t7, 119, A_JUMP		# if w was pressed
 	beq $t7, 97, A_LEFT			# if a was pressed
 	beq $t7, 100, A_RIGHT		# if d was pressed
 	beq $t7, 32, A_JUMP			# if space was pressed
-	beq $t7, 112, A_RESTART		# if P was pressed
-	j update_done				# if not them, back to before
 
+	j update_done				# if not them, back to before
+	
+two_job:
+	# count 5 time to proceed one jump, time to reflect
+	la $s4, counter
+	lw $s3, 0($s4)
+	beqz $s3, t_JUMP
+	addi $s3, $s3, -1
+	sw $s3, 0($s4)
+	
+	# it's not 0, need to jump
+	j determine
+
+t_JUMP:
+	# load me_location to $t2
+	la $t1, me_location
+	lw $t2, 0($t1)
+	
+	la $s4, counter
+	li $s3, WAITTIME
+	sw $s3, 0($s4)
+	# make sure the jump_count is not 0 to indicate it's jumping
+	la $t5, jump_counter
+	lw $t6, 0($t5)
+	# set the jump to current -1
+	addi $t6, $t6, -1
+	sw $t6, 0($t5)
+	j t_actual_jump
+	
+t_actual_jump:
+	addi $t4, $t2, -128
+	# check if it's black
+	la $t0, base_address
+	add $t0, $t0, $t4
+	lw  $t3, 0($t0)
+	bne $t3, BLACK, t_donothing1 # if color is not white, not falling
+	addi $t0, $t0, 4
+	lw  $t3, 0($t0)
+	bne $t3, BLACK, t_donothing1 # if color is not white, not falling
+	addi $t0, $t0, 4
+	lw  $t3, 0($t0)
+	bne $t3, BLACK, t_donothing1 # if color is not white, not falling
+	move $a0, $t2
+	jal erase_me
+	li $a1, -128
+	jal draw_me
+
+t_donothing1: 
+	j determine
 
 A_JUMP:
 	# load me_location to $t2
 	la $t1, me_location
 	lw $t2, 0($t1)
+	
+	# make sure the jump_count is not 0 to indicate it's jumping
+	la $t5, jump_counter
+	li $s7, JUMP_COUNTER
+	sw $s7, 0($t5)
+	
+	# set the counter to be 5
+	la $t6, counter
+	li $s6, WAITTIME
+	sw $s6, 0($t6)
 
+	j actual_jump
+jump_twice:
+	la $t1, me_location
+	lw $t2, 0($t1)
+	j actual_jump_2
+	
+actual_jump:
 	addi $t4, $t2, -128
 	# check if it's black
 	la $t0, base_address
 	add $t0, $t0, $t4
 	lw  $t3, 0($t0)
 	bne $t3, BLACK, donothing1 # if color is not white, not falling
+	addi $t0, $t0, 4
+	lw  $t3, 0($t0)
+	bne $t3, BLACK, donothing1 # if color is not white, not falling
+	addi $t0, $t0, 4
+	lw  $t3, 0($t0)
+	bne $t3, BLACK, donothing1 # if color is not white, not falling
 	move $a0, $t2
 	jal erase_me
-	li $a1, -256
+	li $a1, -128
 	jal draw_me
 
+next_jump: 
+	j jump_twice
+
+actual_jump_2:
+	addi $t4, $t2, -128
+	# check if it's black
+	la $t0, base_address
+	add $t0, $t0, $t4
+	lw  $t3, 0($t0)
+	bne $t3, BLACK, donothing1 # if color is not white, not falling
+	addi $t0, $t0, 4
+	lw  $t3, 0($t0)
+	bne $t3, BLACK, donothing1 # if color is not white, not falling
+	addi $t0, $t0, 4
+	lw  $t3, 0($t0)
+	bne $t3, BLACK, donothing1 # if color is not white, not falling
+	move $a0, $t2
+	jal erase_me
+	li $a1, -128
+	jal draw_me
 donothing1: 
 	j update_done
 
@@ -167,11 +287,19 @@ A_LEFT:
 	# load me_location to $t2
 	la $t1, me_location
 	lw $t2, 0($t1)
-	# check the color before me (offset 512)
 	addi $t4, $t2, -4
 	# check if it's black
 	la $t0, base_address
 	add $t0, $t0, $t4
+	lw  $t3, 0($t0)
+	bne $t3, BLACK, donothing2 # if color is not white, not falling
+	addi $t0, $t0, 128
+	lw  $t3, 0($t0)
+	bne $t3, BLACK, donothing2 # if color is not white, not falling
+	addi $t0, $t0, 128
+	lw  $t3, 0($t0)
+	bne $t3, BLACK, donothing2 # if color is not white, not falling
+	addi $t0, $t0, 128
 	lw  $t3, 0($t0)
 	bne $t3, BLACK, donothing2 # if color is not white, not falling
 	move $a0, $t2
@@ -186,11 +314,19 @@ A_RIGHT:
 	# load me_location to $t2
 	la $t1, me_location
 	lw $t2, 0($t1)
-	# check the color before me (offset 512)
-	addi $t4, $t2, 8
+	addi $t4, $t2, 12
 	# check if it's black
 	la $t0, base_address
 	add $t0, $t0, $t4
+	lw $t3, 0($t0)
+	bne $t3, BLACK, donothing3 # if color is not white, not falling
+	addi $t0, $t0, 128
+	lw  $t3, 0($t0)
+	bne $t3, BLACK, donothing3 # if color is not white, not falling
+	addi $t0, $t0, 128
+	lw  $t3, 0($t0)
+	bne $t3, BLACK, donothing3 # if color is not white, not falling
+	addi $t0, $t0, 128
 	lw  $t3, 0($t0)
 	bne $t3, BLACK, donothing3 # if color is not white, not falling
 	move $a0, $t2
@@ -203,7 +339,10 @@ donothing3:
 
 A_RESTART:
 	# set everything back
-	j game_loop
+	la $t1, me_location
+	li $s1, 6932
+	sw $s1, 0($t1)
+	j start
 # platform_update:
 	# update all the plateforms 
 	# make them move left or right
@@ -1000,13 +1139,14 @@ initialize_screen:
 	sw $t4, 5880($t0)
 	sw $t4, 5884($t0)
 	sw $t4, 5888($t0)
-	sw $t2, 5908($t0)
-	sw $t2, 5912($t0)
-	sw $t2, 5916($t0)
-	sw $t2, 5920($t0)
-	sw $t2, 5924($t0)
-	sw $t2, 5928($t0)
-	sw $t2, 5932($t0)
+	sw $t2, 6484($t0)
+	sw $t2, 6488($t0)
+	sw $t2, 6492($t0)
+	sw $t2, 6496($t0)
+	sw $t2, 6500($t0)
+	sw $t2, 6504($t0)
+	sw $t2, 6508($t0)
+	sw $t2, 6512($t0)
 	sw $t4, 6012($t0)
 	sw $t4, 6016($t0)
 	sw $t4, 6020($t0)
@@ -1028,13 +1168,14 @@ initialize_screen:
 	sw $t4, 6780($t0)
 	sw $t4, 6784($t0)
 	sw $t4, 6788($t0)
-	sw $t2, 6836($t0)
-	sw $t2, 6840($t0)
-	sw $t2, 6844($t0)
-	sw $t2, 6848($t0)
-	sw $t2, 6852($t0)
-	sw $t2, 6856($t0)
-	sw $t2, 6860($t0)
+	sw $t2, 7088($t0)
+	sw $t2, 7092($t0)
+	sw $t2, 7096($t0)
+	sw $t2, 7100($t0)
+	sw $t2, 7104($t0)
+	sw $t2, 7108($t0)
+	sw $t2, 7112($t0)
+	sw $t2, 7116($t0)
 	sw $t4, 6904($t0)
 	sw $t4, 6908($t0)
 	sw $t4, 6912($t0)
@@ -1060,13 +1201,14 @@ initialize_screen:
 	sw $t4, 7548($t0)
 	sw $t4, 7552($t0)
 	sw $t4, 7556($t0)
-	sw $t2, 7564($t0)
-	sw $t2, 7568($t0)
-	sw $t2, 7572($t0)
-	sw $t2, 7576($t0)
-	sw $t2, 7580($t0)
-	sw $t2, 7584($t0)
-	sw $t2, 7588($t0)
+	sw $t2, 7692($t0)
+	sw $t2, 7696($t0)
+	sw $t2, 7700($t0)
+	sw $t2, 7704($t0)
+	sw $t2, 7708($t0)
+	sw $t2, 7712($t0)
+	sw $t2, 7716($t0)
+	sw $t2, 7720($t0)
 	sw $t4, 7672($t0)
 	sw $t4, 7676($t0)
 	sw $t4, 7680($t0)
