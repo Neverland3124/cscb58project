@@ -17,7 +17,7 @@
 # (See the assignment handout for descriptions of the milestones)
 # - Milestone 1 - done
 # - Milestone 2 - done
-# - Milestone 3 - working on
+# - Milestone 3 - done
 # (choose the one the applies)
 #
 # Which approved features have been implemented for milestone 3?
@@ -27,7 +27,8 @@
 # 3. Win condition - if the player touch the win object
 # 4. Moving objects - the last three platform will disappear when time passed. The win object will hovering gently up and down. The obstacles will move left and right make the game harder.
 # 5. Moving platforms - there are three platform will move around, make the game harder
-# 6. double jump - allow the player do double jump but no triple jump
+# 6. double jump - allow the player do double jump but no triple jump, the second jump
+# 				will reload the jump system so the best way to jump is to wait the first jump reach the top
 #
 # Link to video demonstration for final submission:
 # - (insert YouTube / MyMedia / other URL here). Make sure we can view it!
@@ -60,6 +61,7 @@
 
 
 .data
+double_jump_counter: 1
 me_location: .word 6932
 heart: .word 5
 platforms: .word 2456, 3996, 5552
@@ -153,13 +155,12 @@ ob_location_back:
 	la $t0, base_address
 	add $t0, $t0, $t4
 	lw  $t3, 0($t0)
-	
+
 	bne $t3, BLACK, no_gravity # if color is not white, not falling
-	
 	# make sure the jump_count is 0 to fall
 	la $t5, jump_counter
 	lw $t6, 0($t5)
-	bnez $t6, no_gravity
+	bnez $t6, gravity_done
 	
 	addi $t0, $t0, 4
 	lw  $t3, 0($t0)
@@ -168,18 +169,23 @@ ob_location_back:
 	lw  $t3, 0($t0)
 	bne $t3, BLACK, no_gravity # if color is not white, not falling
 	# have gravity (in the space), falling
-	
+	# black under it
+
 	move $a0, $t2
 	jal erase_me
 	li $a1, 128
 	jal draw_me
-	
+	j gravity_done
 no_gravity:
-
+	la $s5, double_jump_counter
+	li $s6, 1
+	sw $s6, 0($s5)
+gravity_done:
 	# milestone 3
 	# jal platform_update
 
 	# able to control me
+	# todo: double jump
 	jal me_update
 	
 update_done:
@@ -240,7 +246,6 @@ update_done:
 	# if blue, do nothing
 
 	# if green or grey, heart - 1, continue
-	# todo: grey
 	# t2 is me
 	la $t1, me_location
 	lw $t2, 0($t1)
@@ -724,13 +729,38 @@ determine:
 	# restart will be faster than anycase
 	beq $t7, 112, A_RESTART		# if P was pressed
 	# DETERMINE WHICH DIRECTION IT IS GOING
-	beq $t7, 119, A_JUMP		# if w was pressed
+
 	beq $t7, 97, A_LEFT			# if a was pressed
 	beq $t7, 100, A_RIGHT		# if d was pressed
-	beq $t7, 32, A_JUMP			# if space was pressed
 
+	# if under is black and double jump counter is 0
+	la $t1, me_location
+	lw $t2, 0($t1)
+	addi $t2, $t2, 512
+	# me is at t2
+	la $t0, base_address
+	add $t0, $t0, $t2
+	lw $t3, 0($t0)
+	bne $t3, WHITE, another
+	# if the color is white, doesn't care
+can_jump:
+	beq $t7, 119, A_JUMP
+	j update_done	
+another:
+	# color is not white
+	la $t1, double_jump_counter
+	lw $t2, 0($t1)
+	beq $t2, $zero, no_jump
+	# it's 1, can jump, and you are in the sky
+	beq $t7, 119, jumped
+no_jump:
 	j update_done				# if not them, back to before
 	
+jumped:
+	# it jumped, make the double jump counter 0
+	sw $zero, 0($t1)
+	j can_jump
+
 two_job:
 	# count 5 time to proceed one jump, time to reflect
 	la $s4, counter
@@ -929,6 +959,10 @@ A_RESTART:
 	li $s1, platform_counter
 	sw $s1, 0($t1)
 
+	la $t1, double_jump_counter
+	li $s1, 1
+	sw $s1, 0($t1)
+
 	la $t1, direction_for_platforms
 	li $s1, 0
 	li $s2, 1
@@ -1029,6 +1063,10 @@ restart_game:
 
 	la $t1, counter_for_platforms
 	li $s1, platform_counter
+	sw $s1, 0($t1)
+
+	la $t1, double_jump_counter
+	li $s1, 1
 	sw $s1, 0($t1)
 
 	la $t1, direction_for_platforms
