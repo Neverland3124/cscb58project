@@ -262,32 +262,32 @@ update_done:
 	lw  $t3, 0($t0)
 	beq $t3, GREEN, touch_green_left
 	beq $t3, GREY, touch_green_left
-	beq $t3, WHITE, touch_white_left
+	#beq $t3, WHITE, touch_white_left
 	addi $t0, $t0, 128
 	lw  $t3, 0($t0)
 	beq $t3, GREEN, touch_green_left
 	beq $t3, GREY, touch_green_left
-	beq $t3, WHITE, touch_white_left
+	#beq $t3, WHITE, touch_white_left
 	addi $t0, $t0, 128
 	lw  $t3, 0($t0)
 	beq $t3, GREEN, touch_green_left
 	beq $t3, GREY, touch_green_left
-	beq $t3, WHITE, touch_white_left
+	#beq $t3, WHITE, touch_white_left
 	addi $t0, $t0, 16
 	lw  $t3, 0($t0)
 	beq $t3, GREEN, touch_green_right
 	beq $t3, GREY, touch_green_right
-	beq $t3, WHITE, touch_white_right
+	#beq $t3, WHITE, touch_white_right
 	addi $t0, $t0, -128
 	lw  $t3, 0($t0)
 	beq $t3, GREEN, touch_green_right
 	beq $t3, GREY, touch_green_right
-	beq $t3, WHITE, touch_white_right
+	#beq $t3, WHITE, touch_white_right
 	addi $t0, $t0, -128
 	lw  $t3, 0($t0)
 	beq $t3, GREEN, touch_green_right
 	beq $t3, GREY, touch_green_right
-	beq $t3, WHITE, touch_white_right
+	#beq $t3, WHITE, touch_white_right
 	addi $t0, $t0, -128
 	lw  $t3, 0($t0)
 	beq $t3, GREEN, touch_green_right
