@@ -22,10 +22,12 @@
 #
 # Which approved features have been implemented for milestone 3?
 # (See the assignment handout for the list of additional features)
-# 1. (fill in the feature, if any)
-# 2. (fill in the feature, if any)
-# 3. (fill in the feature, if any)
-# ... (add more if necessary)
+# 1. Health -  track and show the player's health, every round a player have 5 heart
+# 2. Fail condition - if the player loss all the heart or fall to the fire at the ground
+# 3. Win condition - if the player touch the win object
+# 4. Moving objects - the last three platform will disappear when time passed. The win object will hovering gently up and down. The obstacles will move left and right make the game harder.
+# 5. Moving platforms - there are three platform will move around, make the game harder
+# 6. double jump - allow the player do double jump but no triple jump
 #
 # Link to video demonstration for final submission:
 # - (insert YouTube / MyMedia / other URL here). Make sure we can view it!
@@ -52,13 +54,20 @@
 .eqv GREEN 0x0000ff00
 .eqv WAITTIME 3
 .eqv JUMP_COUNTER 5
+.eqv platform_counter 7
+.eqv ob_counter 16
 # data need to store
 
 
 .data
 me_location: .word 6932
 heart: .word 5
-platform: .word 1692, 2240, 3908, 4924, 5976, 6836, 7564
+platforms: .word 2456, 3996, 5552
+obs: .word 2996, 4568
+direction_for_platforms: 0, 1, 0
+direction_for_obs: 0, 1
+counter_for_platforms: platform_counter
+counter_for_obstacles: ob_counter
 offset: .word 512
 jump_counter: .word 0
 counter: .word 0
@@ -93,8 +102,7 @@ game_loop:
 	la $t1, heart
 	lw $t9, 0($t1)
 	beqz $t9, gameover
-	# load me_location to $t2
-
+	# this is for the erase floor stuff
 	la $t1, counter_for_floor
 	lw $t2, 0($t1)
 	# less than 0, do nothing
@@ -113,7 +121,29 @@ erase_floor_back:
 	addi $t2, $t2, -1
 	sw $t2, 0($t1)
 less_than_0:
+	# if the counter count to 0, platform changes
+	la $t1, counter_for_platforms
+	lw $t2, 0($t1)
+	beqz $t2, platform_change
+	# start update floor_location
+	# need to update three floors
+	addi $t2, $t2, -1
+	sw $t2, 0($t1)
 
+floor_location_back:
+
+	la $t1, counter_for_obstacles
+	lw $t2, 0($t1)
+	beqz $t2, ob_change
+	# start update floor_location
+	# need to update three floors
+	addi $t2, $t2, -1
+	sw $t2, 0($t1)
+
+ob_location_back:
+
+
+	# start update me_location
 	la $t1, me_location
 	lw $t2, 0($t1)
 	# check the color under me (offset 512)
@@ -218,18 +248,46 @@ update_done:
 	# t4 is the current place 
 	la $t0, base_address
 	add $t0, $t0, $t4
-	lw  $t3, 0($t0)
+	 lw  $t3, 0($t0)
 	# it touch the win item, end the game
 	beq $t3, GREEN, touch_green_left
+	beq $t3, GREY, touch_green_left
+	beq $t3, WHITE, touch_white_left
 	addi $t0, $t0, 128
 	lw  $t3, 0($t0)
 	beq $t3, GREEN, touch_green_left
+	beq $t3, GREY, touch_green_left
+	beq $t3, WHITE, touch_white_left
+	addi $t0, $t0, 128
+	lw  $t3, 0($t0)
+	beq $t3, GREEN, touch_green_left
+	beq $t3, GREY, touch_green_left
+	beq $t3, WHITE, touch_white_left
+	addi $t0, $t0, 128
+	lw  $t3, 0($t0)
+	beq $t3, GREEN, touch_green_left
+	beq $t3, GREY, touch_green_left
+	beq $t3, WHITE, touch_white_left
 	addi $t0, $t0, 16
 	lw  $t3, 0($t0)
 	beq $t3, GREEN, touch_green_right
+	beq $t3, GREY, touch_green_right
+	beq $t3, WHITE, touch_white_right
 	addi $t0, $t0, -128
 	lw  $t3, 0($t0)
 	beq $t3, GREEN, touch_green_right
+	beq $t3, GREY, touch_green_right
+	beq $t3, WHITE, touch_white_right
+	addi $t0, $t0, -128
+	lw  $t3, 0($t0)
+	beq $t3, GREEN, touch_green_right
+	beq $t3, GREY, touch_green_right
+	beq $t3, WHITE, touch_white_right
+	addi $t0, $t0, -128
+	lw  $t3, 0($t0)
+	beq $t3, GREEN, touch_green_right
+	beq $t3, GREY, touch_green_right
+	beq $t3, WHITE, touch_white_right
 
 green_continue:
 
@@ -242,6 +300,268 @@ green_continue:
 	# sw $t9, 0($t0)		# $t9 = ship health
 	j game_loop
 
+move_up_win:
+	# move the object up
+	li $a0, 1208
+	jal erase_win_object
+	addi $a0, $a0, -128
+	jal draw_win_object
+	j win_back
+move_down_win:
+	# move the object up
+	li $a0, 1080
+	jal erase_win_object
+	addi $a0, $a0, 128
+	jal draw_win_object
+	j win_back
+ob_change:
+	# make the counter restart
+	la $t1, counter_for_obstacles
+	li $t2, ob_counter
+	sw $t2, 0($t1)
+
+	# move the win object
+	la $t0, base_address
+	addi $t0, $t0, 1080
+	lw $t1, 0($t0)
+	# if the color is black, move the object up
+	beq $t1, BLACK, move_up_win
+	j move_down_win
+win_back:
+	# move the platform
+	la $t1, obs
+	lw $t2, 0($t1)
+	lw $t3, 4($t1)
+	la $t1, direction_for_obs
+	lw $t5, 0($t1)
+	lw $t6, 4($t1)
+
+	li $s1, 2996
+	li $s2, 3008
+	beq $s1, $t2, bounce_right1_ob
+	beq $s2, $t2, bounce_left1_ob
+	# do the current thing
+bounce_1_ob:
+	li $s1, 4556
+	li $s2, 4568
+	beq $s1, $t3, bounce_right2_ob
+	beq $s2, $t3, bounce_left2_ob
+
+bounce_2_ob:
+	# 0 go right
+	la $t1, obs
+	move $a0, $t2
+	beq $t5, $zero, go_right_platform1_ob
+	j go_left_platform1_ob
+second_platform_ob: 
+	move $a0, $t3
+	beq $t6, $zero, go_right_platform2_ob
+	j go_left_platform2_ob
+
+bounce_right1_ob:
+	# the platform reach the left most, change direction to right
+	la $t1, direction_for_obs
+	li $s7, 0
+	sw $s7, 0($t1)
+	j bounce_1_ob
+
+bounce_left1_ob:
+	# the platform reach the left most, change direction to right
+	la $t1, direction_for_obs
+	li $s7, 1
+	sw $s7, 0($t1)
+	j bounce_1_ob
+bounce_right2_ob:
+	# the platform reach the left most, change direction to right
+	la $t1, direction_for_obs
+	li $s7, 0
+	sw $s7, 4($t1)
+	j bounce_2_ob
+
+bounce_left2_ob:
+	# the platform reach the left most, change direction to right
+	la $t1, direction_for_obs
+	li $s7, 1
+	sw $s7, 4($t1)
+	j bounce_2_ob
+
+go_right_platform1_ob: 
+	# make the platform go right
+	# $a0 is the platform location
+	jal erase_ob
+	addi $a0, $a0, 4
+	jal draw_ob
+	sw $a0, 0($t1)
+	j second_platform_ob
+
+go_left_platform1_ob: 
+	# make the platform go right
+	# $a0 is the platform location
+	jal erase_ob
+	addi $a0, $a0, -4
+	jal draw_ob
+	sw $a0, 0($t1)
+	j second_platform_ob
+go_right_platform2_ob: 
+	# make the platform go right
+	# $a0 is the platform location
+	jal erase_ob
+	addi $a0, $a0, 4
+	jal draw_ob
+	sw $a0, 4($t1)
+	j ob_location_back
+
+go_left_platform2_ob: 
+	# make the platform go right
+	# $a0 is the platform location
+	jal erase_ob
+	addi $a0, $a0, -4
+	jal draw_ob
+	sw $a0, 4($t1)
+	j ob_location_back
+
+platform_change:
+	# make the counter restart
+	la $t1, counter_for_platforms
+	li $t2, platform_counter
+	sw $t2, 0($t1)
+	# move the platform
+	la $t1, platforms
+	lw $t2, 0($t1)
+	lw $t3, 4($t1)
+	lw $t4, 8($t1)
+	la $t1, direction_for_platforms
+	lw $t5, 0($t1)
+	lw $t6, 4($t1)
+	lw $t7, 8($t1)
+	# if t5 is 0, t2 go right
+	# if not touch the boundary, normalcase
+	# count the boundary value to decide
+	# boundary of platform 1 / 2 / 3 
+	# 
+	li $s1, 2444
+	li $s2, 2516
+	beq $s1, $t2, bounce_right1
+	beq $s2, $t2, bounce_left1
+	# do the current thing
+bounce_1:
+	li $s1, 3980
+	li $s2, 4052
+	beq $s1, $t3, bounce_right2
+	beq $s2, $t3, bounce_left2
+
+bounce_2:
+	li $s1, 5516
+	li $s2, 5588
+	beq $s1, $t4, bounce_right3
+	beq $s2, $t4, bounce_left3
+
+bounce_3:
+	# 0 go right
+	la $t1, platforms
+	move $a0, $t2
+	beq $t5, $zero, go_right_platform1
+	j go_left_platform1
+second_platform: 
+	move $a0, $t3
+	beq $t6, $zero, go_right_platform2
+	j go_left_platform2
+third_platform:
+	move $a0, $t4
+	beq $t7, $zero, go_right_platform3
+	j go_left_platform3
+
+bounce_right1:
+	# the platform reach the left most, change direction to right
+	la $t1, direction_for_platforms
+	li $s7, 0
+	sw $s7, 0($t1)
+	j bounce_1
+
+bounce_left1:
+	# the platform reach the left most, change direction to right
+	la $t1, direction_for_platforms
+	li $s7, 1
+	sw $s7, 0($t1)
+	j bounce_1
+bounce_right2:
+	# the platform reach the left most, change direction to right
+	la $t1, direction_for_platforms
+	li $s7, 0
+	sw $s7, 4($t1)
+	j bounce_2
+
+bounce_left2:
+	# the platform reach the left most, change direction to right
+	la $t1, direction_for_platforms
+	li $s7, 1
+	sw $s7, 4($t1)
+	j bounce_2
+bounce_right3:
+	# the platform reach the left most, change direction to right
+	la $t1, direction_for_platforms
+	li $s7, 0
+	sw $s7, 8($t1)
+	j bounce_3
+
+bounce_left3:
+	# the platform reach the left most, change direction to right
+	la $t1, direction_for_platforms
+	li $s7, 1
+	sw $s7, 8($t1)
+	j bounce_3
+
+go_right_platform1: 
+	# make the platform go right
+	# $a0 is the platform location
+	jal erase_floor
+	addi $a0, $a0, 4
+	jal draw_floor
+	sw $a0, 0($t1)
+	j second_platform
+
+go_left_platform1: 
+	# make the platform go right
+	# $a0 is the platform location
+	jal erase_floor
+	addi $a0, $a0, -4
+	jal draw_floor
+	sw $a0, 0($t1)
+	j second_platform
+go_right_platform2: 
+	# make the platform go right
+	# $a0 is the platform location
+	jal erase_floor
+	addi $a0, $a0, 4
+	jal draw_floor
+	sw $a0, 4($t1)
+	j third_platform
+
+go_left_platform2: 
+	# make the platform go right
+	# $a0 is the platform location
+	jal erase_floor
+	addi $a0, $a0, -4
+	jal draw_floor
+	sw $a0, 4($t1)
+	j third_platform
+go_right_platform3: 
+	# make the platform go right
+	# $a0 is the platform location
+	jal erase_floor
+	addi $a0, $a0, 4
+	jal draw_floor
+	sw $a0, 8($t1)
+	j floor_location_back
+
+go_left_platform3: 
+	# make the platform go right
+	# $a0 is the platform location
+	jal erase_floor
+	addi $a0, $a0, -4
+	jal draw_floor
+	sw $a0, 8($t1)
+	j floor_location_back
 
 erase_floor_pre_1:
 	li $a0, 7564
@@ -255,6 +575,31 @@ erase_floor_pre_3:
 	li $a0, 6356
 	jal erase_floor
 	j erase_floor_back
+
+touch_white_left:
+	la $t1, me_location
+	lw $t2, 0($t1)
+	li $v0, 32
+	li $a0, 200
+	syscall
+	move $a0, $t2
+	jal erase_me
+	li $a1, 4
+	jal draw_me
+	j green_continue
+
+touch_white_right:
+	la $t1, me_location
+	lw $t2, 0($t1)
+	li $v0, 32
+	li $a0, 200
+	syscall
+	move $a0, $t2
+	jal erase_me
+	li $a1, -4
+	jal draw_me
+	j green_continue
+
 
 touch_green_left:
 	la $t1, me_location
@@ -572,7 +917,44 @@ A_RESTART:
 	li $s1, 150
 	sw $s1, 0($t1)
 
+	la $t1, platforms
+	li $s1, 2456
+	li $s2, 3996
+	li $s3, 5552
+	sw $s1, 0($t1)
+	sw $s2, 4($t1)
+	sw $s3, 8($t1)
+
+	la $t1, counter_for_platforms
+	li $s1, platform_counter
+	sw $s1, 0($t1)
+
+	la $t1, direction_for_platforms
+	li $s1, 0
+	li $s2, 1
+	li $s3, 0
+	sw $s1, 0($t1)
+	sw $s2, 4($t1)
+	sw $s3, 8($t1)
+	
+	la $t1, obs
+	li $s1, 2996
+	li $s2, 4568
+	sw $s1, 0($t1)
+	sw $s2, 4($t1)
+
+	la $t1, counter_for_obstacles
+	li $s1, ob_counter
+	sw $s1, 0($t1)
+
+	la $t1, direction_for_obs
+	li $s1, 0
+	li $s2, 1
+	sw $s1, 0($t1)
+	sw $s2, 4($t1)
+
 	j start
+
 # platform_update:
 	# update all the plateforms 
 	# make them move left or right
@@ -637,6 +1019,42 @@ restart_game:
 	li $s1, 150
 	sw $s1, 0($t1)
 
+	la $t1, platforms
+	li $s1, 2456
+	li $s2, 3996
+	li $s3, 5552
+	sw $s1, 0($t1)
+	sw $s2, 4($t1)
+	sw $s3, 8($t1)
+
+	la $t1, counter_for_platforms
+	li $s1, platform_counter
+	sw $s1, 0($t1)
+
+	la $t1, direction_for_platforms
+	li $s1, 0
+	li $s2, 1
+	li $s3, 0
+	sw $s1, 0($t1)
+	sw $s2, 4($t1)
+	sw $s3, 8($t1)
+
+	la $t1, obs
+	li $s1, 2996
+	li $s2, 4568
+	sw $s1, 0($t1)
+	sw $s2, 4($t1)
+
+	la $t1, counter_for_obstacles
+	li $s1, ob_counter
+	sw $s1, 0($t1)
+
+	la $t1, direction_for_obs
+	li $s1, 0
+	li $s2, 1
+	sw $s1, 0($t1)
+	sw $s2, 4($t1)
+
 	# wait 3 second to end
 	li $v0, 32
 	li $a0, 3000
@@ -669,6 +1087,70 @@ erase_floor:
 	sw $s0, 20($t0)
 	sw $s0, 24($t0)
 	sw $s0, 28($t0)
+	jr $ra
+
+draw_floor:
+	la $t0, base_address
+	add $t0, $t0, $a0
+	li $s0, WHITE
+	sw $s0, 0($t0)
+	sw $s0, 4($t0)
+	sw $s0, 8($t0)
+	sw $s0, 12($t0)
+	sw $s0, 16($t0)
+	sw $s0, 20($t0)
+	sw $s0, 24($t0)
+	sw $s0, 28($t0)
+	jr $ra
+erase_ob:
+	la $t0, base_address
+	add $t0, $t0, $a0
+	li $s0, BLACK
+	sw $s0, 4($t0)
+	sw $s0, 128($t0)
+	sw $s0, 132($t0)
+	sw $s0, 136($t0)
+	jr $ra
+
+draw_ob:
+	la $t0, base_address
+	add $t0, $t0, $a0
+	li $s0, GREY
+	sw $s0, 4($t0)
+	sw $s0, 128($t0)
+	sw $s0, 132($t0)
+	sw $s0, 136($t0)
+	jr $ra
+erase_win_object:
+	la $t0, base_address
+	add $t0, $t0, $a0
+	li $s0, BLACK
+	sw $s0, 0($t0)
+	sw $s0, 8($t0)
+	sw $s0, 16($t0)
+	sw $s0, 128($t0)
+	sw $s0, 132($t0)
+	sw $s0, 136($t0)
+	sw $s0, 140($t0)
+	sw $s0, 144($t0)
+	sw $s0, 260($t0)
+	sw $s0, 268($t0)
+	jr $ra
+
+draw_win_object:
+	la $t0, base_address
+	add $t0, $t0, $a0
+	li $s0, GOLDEN
+	sw $s0, 0($t0)
+	sw $s0, 8($t0)
+	sw $s0, 16($t0)
+	sw $s0, 128($t0)
+	sw $s0, 132($t0)
+	sw $s0, 136($t0)
+	sw $s0, 140($t0)
+	sw $s0, 144($t0)
+	sw $s0, 260($t0)
+	sw $s0, 268($t0)
 	jr $ra
 
 clear_screen:
